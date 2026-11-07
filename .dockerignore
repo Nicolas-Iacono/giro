@@ -1,0 +1,8 @@
+target
+.idea
+config
+data
+*.log
+*.properties
+!src/main/resources/application.properties
+!src/test/resources/application-test.properties

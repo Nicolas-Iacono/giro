@@ -1,0 +1,14 @@
+package com.giro.repo;
+
+import com.giro.domain.EstadoPedido;
+import com.giro.domain.Pedido;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface PedidoRepository extends JpaRepository<Pedido, Long> {
+    List<Pedido> findByComercioIdOrderByCreadoEnDesc(Long comercioId);
+    Optional<Pedido> findByIdAndComercioId(Long id, Long comercioId);
+    long countByComercioIdAndEstado(Long comercioId, EstadoPedido estado);
+}

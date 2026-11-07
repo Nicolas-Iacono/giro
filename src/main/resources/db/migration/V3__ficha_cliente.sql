@@ -1,0 +1,11 @@
+ALTER TABLE clientes
+    ADD COLUMN documento VARCHAR(32),
+    ADD COLUMN direccion VARCHAR(180),
+    ADD COLUMN categoria VARCHAR(20) NOT NULL DEFAULT 'ESTANDAR',
+    ADD COLUMN avisos_whatsapp BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN cuenta_corriente BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD COLUMN limite_credito NUMERIC(14, 2),
+    ADD COLUMN plazo_dias INTEGER,
+    ADD COLUMN aviso_vencimiento BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN talle VARCHAR(8),
+    ADD COLUMN intereses VARCHAR(80);

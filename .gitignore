@@ -1,0 +1,7 @@
+target/
+.idea/
+data/
+config/supabase.properties
+.env
+*.log
+.DS_Store

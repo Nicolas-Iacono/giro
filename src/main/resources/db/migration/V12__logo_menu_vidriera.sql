@@ -1,0 +1,3 @@
+ALTER TABLE vidrieras
+    ADD COLUMN logo_url VARCHAR(500),
+    ADD COLUMN menu VARCHAR(20) NOT NULL DEFAULT 'lados';

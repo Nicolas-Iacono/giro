@@ -1,0 +1,5 @@
+ALTER TABLE clientes ADD COLUMN altura VARCHAR(16);
+ALTER TABLE clientes ADD COLUMN localidad VARCHAR(80);
+ALTER TABLE clientes ADD COLUMN partido VARCHAR(80);
+ALTER TABLE clientes ADD COLUMN provincia VARCHAR(40);
+ALTER TABLE clientes ADD COLUMN codigo_postal VARCHAR(8);

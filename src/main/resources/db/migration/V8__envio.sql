@@ -1,0 +1,12 @@
+ALTER TABLE comercios ADD COLUMN calle VARCHAR(120);
+ALTER TABLE comercios ADD COLUMN altura VARCHAR(16);
+ALTER TABLE comercios ADD COLUMN localidad VARCHAR(80);
+ALTER TABLE comercios ADD COLUMN partido VARCHAR(80);
+ALTER TABLE comercios ADD COLUMN provincia VARCHAR(40);
+ALTER TABLE comercios ADD COLUMN codigo_postal VARCHAR(8);
+ALTER TABLE comercios ADD COLUMN envio_base NUMERIC(14, 2);
+ALTER TABLE comercios ADD COLUMN envio_km NUMERIC(14, 2);
+
+ALTER TABLE pedidos ADD COLUMN envio NUMERIC(14, 2) NOT NULL DEFAULT 0;
+ALTER TABLE pedidos ADD COLUMN distancia_km NUMERIC(8, 1);
+ALTER TABLE pedidos ADD COLUMN punto_nombre VARCHAR(160);

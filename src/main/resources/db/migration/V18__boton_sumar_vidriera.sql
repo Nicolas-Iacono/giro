@@ -1,0 +1,5 @@
+ALTER TABLE vidrieras
+    ADD COLUMN sumar VARCHAR(24) NOT NULL DEFAULT '',
+    ADD COLUMN sumar_forma VARCHAR(20) NOT NULL DEFAULT 'circular',
+    ADD COLUMN sumar_color VARCHAR(7),
+    ADD COLUMN sumar_visible BOOLEAN NOT NULL DEFAULT TRUE;
