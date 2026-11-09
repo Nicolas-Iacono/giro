@@ -369,6 +369,9 @@ public final class ApiRest {
         @PostMapping("/whatsapp/preparar")
         public Map<String, Object> prepararWhatsapp() { return ajustes.prepararWhatsapp(); }
 
+        @PostMapping("/whatsapp/sincronizar")
+        public Map<String, Object> sincronizarWhatsapp() { return ajustes.sincronizarWhatsapp(); }
+
         @PostMapping("/whatsapp/conectar")
         public Map<String, Object> conectar(@RequestBody Modelos.ConectarWhatsapp entrada) { return ajustes.conectarWhatsapp(entrada); }
     }

@@ -85,9 +85,25 @@ public class AjustesService {
                             throw new NegocioException("Ese número de WhatsApp ya está conectado a otro comercio de Giro");
                         });
             }
-            comercio.setWaPhoneNumberId(phone);
-            comercio.setWaWabaId(telefonoMeta(entrada.waWabaId()));
+            String waba = telefonoMeta(entrada.waWabaId());
             String token = tokenNuevo(entrada.waAccessToken());
+            boolean cambia = token != null || !java.util.Objects.equals(phone, comercio.getWaPhoneNumberId())
+                    || !java.util.Objects.equals(waba, comercio.getWaWabaId());
+            if (cambia) {
+                if (phone == null && waba == null && token == null) {
+                    throw new NegocioException("Para quitar una conexión usá Desconectar; no borres los IDs manualmente");
+                }
+                Map<String, Object> validado = whatsapp.validarCredenciales(phone, waba,
+                        token == null ? whatsapp.tokenPlano(comercio) : token);
+                comercio.setWaNumero((String) validado.get("displayPhoneNumber"));
+                comercio.setWaNombre((String) validado.get("verifiedName"));
+                comercio.setWaEstado("VALIDADO");
+                comercio.setWaTipo("MANUAL");
+                comercio.setWaHistorial("NO_PEDIDO");
+                comercio.setWaAviso("Credenciales verificadas. Suscribí la cuenta al webhook antes de probar la recepción.");
+            }
+            comercio.setWaPhoneNumberId(phone);
+            comercio.setWaWabaId(waba);
             if (token != null) whatsapp.guardarToken(comercio, token);
             boolean activo = entrada.waActivo();
             if (activo && (comercio.getWaPhoneNumberId() == null || comercio.getWaAccessToken() == null || comercio.getWaAccessToken().isBlank())) {
@@ -118,7 +134,7 @@ public class AjustesService {
         return resultado;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Map<String, Object> suscribirWhatsapp(Modelos.SuscribirWhatsapp entrada) {
         sesion.exigirGestion();
         Comercio comercio = comercio();
@@ -126,7 +142,15 @@ public class AjustesService {
         if (waba == null) waba = comercio.getWaWabaId();
         String token = entrada == null ? null : tokenNuevo(entrada.accessToken());
         if (token == null) token = whatsapp.tokenPlano(comercio);
-        return whatsapp.suscribir(waba, token);
+        Map<String, Object> resultado = whatsapp.suscribir(waba, token);
+        boolean guardado = java.util.Objects.equals(waba, comercio.getWaWabaId())
+                && java.util.Objects.equals(token, whatsapp.tokenPlano(comercio));
+        if (guardado && Boolean.TRUE.equals(resultado.get("campos")) && Boolean.TRUE.equals(resultado.get("waba"))) {
+            comercio.setWaEstado("CONECTADO");
+            comercio.setWaAviso(null);
+        }
+        resultado.put("ajustes", vista(comercio));
+        return resultado;
     }
 
     @Transactional
@@ -175,8 +199,10 @@ public class AjustesService {
         Object nombre = meta.get("verifiedName");
         if (nombre != null) comercio.setWaNombre(String.valueOf(nombre));
         comercio.setWaTipo(String.valueOf(meta.get("tipo")));
-        comercio.setWaEstado("CONECTADO");
-        comercio.setWaActivo(true);
+        boolean webhook = Boolean.TRUE.equals(meta.get("webhookSuscripto"));
+        comercio.setWaEstado(webhook ? "CONECTADO" : "PENDIENTE_WEBHOOK");
+        // El bot se activa a elección del comercio, no como efecto del registro.
+        comercio.setWaActivo(false);
         comercio.setWaConectadoEn(LocalDateTime.now());
         comercio.setWaRevocadoEn(null);
         if (meta.get("expiresIn") instanceof Number segundos && segundos.longValue() > 0) {
@@ -184,12 +210,26 @@ public class AjustesService {
         } else {
             comercio.setWaTokenVenceEn(null);
         }
-        comercio.setWaHistorial("COEXISTENCIA".equals(meta.get("tipo")) ? "PENDIENTE" : "NO_PEDIDO");
-        comercio.setWaAviso(meta.get("avisoSuscripcion") == null ? null : String.valueOf(meta.get("avisoSuscripcion")));
+        comercio.setWaHistorial("NO_PEDIDO");
+        String avisoConexion = meta.get("avisoSuscripcion") == null ? null : String.valueOf(meta.get("avisoSuscripcion"));
+        comercio.setWaAviso(avisoConexion == null ? null : avisoConexion.substring(0, Math.min(400, avisoConexion.length())));
         Map<String, Object> body = vista(comercio);
         body.put("webhookSuscripto", meta.get("webhookSuscripto"));
         body.put("sincronizacionPedida", meta.get("sincronizacionPedida"));
         return body;
+    }
+
+    @Transactional
+    public Map<String, Object> sincronizarWhatsapp() {
+        sesion.exigirGestion();
+        Comercio comercio = comercio();
+        if (!"COEXISTENCIA".equals(comercio.getWaTipo()) || !"CONECTADO".equals(comercio.getWaEstado())) {
+            throw new NegocioException("Primero completá la conexión con coexistencia y el webhook");
+        }
+        boolean pedido = whatsapp.pedirSincronizacion(comercio.getWaPhoneNumberId(), whatsapp.tokenPlano(comercio));
+        comercio.setWaHistorial(pedido ? "PENDIENTE" : "ERROR");
+        comercio.setWaAviso(pedido ? null : "Meta no inició toda la sincronización. Revisá el consentimiento y volvé a intentar desde Ajustes.");
+        return vista(comercio);
     }
 
     private void alinearTitulo(Vidriera vidriera, String anterior, String nombre) {
