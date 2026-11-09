@@ -8,12 +8,15 @@ import com.giro.repo.ImagenProductoRepository;
 import com.giro.repo.ProductoRepository;
 import com.giro.repo.VidrieraRepository;
 import com.giro.seguridad.Sesion;
+import com.giro.servicio.AjustesService;
 import com.giro.servicio.ArchivoService;
 import com.giro.servicio.AuthService;
 import com.giro.servicio.CatalogoService;
 import com.giro.servicio.ComercialService;
 import com.giro.servicio.EnvioService;
 import com.giro.servicio.TableroService;
+import com.giro.servicio.WhatsappBandejaService;
+import com.giro.servicio.WhatsappGiroService;
 import jakarta.validation.Valid;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
@@ -338,6 +341,86 @@ public final class ApiRest {
         public ResponseEntity<?> foto(@PathVariable String slug, @PathVariable Long imagenId) throws Exception {
             ImagenProducto imagen = catalogo.imagenPublica(slug, imagenId);
             return servir(imagen.getArchivo(), archivos);
+        }
+    }
+
+    @RestController
+    @RequestMapping("/api/ajustes")
+    public static class AjustesApi {
+        private final AjustesService ajustes;
+        public AjustesApi(AjustesService ajustes) { this.ajustes = ajustes; }
+
+        @GetMapping
+        public Map<String, Object> ver() { return ajustes.ver(); }
+
+        @PutMapping
+        public Map<String, Object> guardar(@Valid @RequestBody Modelos.AjustesEntrada entrada) { return ajustes.guardar(entrada); }
+
+        @PostMapping("/whatsapp/probar")
+        public Map<String, Object> probar(@RequestBody(required = false) Modelos.ProbarWhatsapp entrada) {
+            return ajustes.probarWhatsapp(entrada);
+        }
+
+        @PostMapping("/whatsapp/suscribir")
+        public Map<String, Object> suscribir(@RequestBody(required = false) Modelos.SuscribirWhatsapp entrada) {
+            return ajustes.suscribirWhatsapp(entrada);
+        }
+
+        @PostMapping("/whatsapp/preparar")
+        public Map<String, Object> prepararWhatsapp() { return ajustes.prepararWhatsapp(); }
+
+        @PostMapping("/whatsapp/conectar")
+        public Map<String, Object> conectar(@RequestBody Modelos.ConectarWhatsapp entrada) { return ajustes.conectarWhatsapp(entrada); }
+    }
+
+    @RestController
+    @RequestMapping("/api/whatsapp")
+    public static class WhatsappBandejaApi {
+        private final WhatsappBandejaService bandeja;
+        public WhatsappBandejaApi(WhatsappBandejaService bandeja) { this.bandeja = bandeja; }
+
+        @GetMapping("/conversaciones")
+        public List<Map<String, Object>> conversaciones() { return bandeja.conversaciones(); }
+
+        @GetMapping("/conversaciones/{id}")
+        public Map<String, Object> conversacion(@PathVariable Long id) { return bandeja.conversacion(id); }
+
+        @PostMapping("/conversaciones/{id}/mensajes")
+        public Map<String, Object> enviar(@PathVariable Long id, @Valid @RequestBody Modelos.TextoWhatsapp entrada) {
+            return bandeja.enviar(id, entrada);
+        }
+
+        @PostMapping("/conversaciones/{id}/bot")
+        public Map<String, Object> bot(@PathVariable Long id, @RequestBody Modelos.BotWhatsapp entrada) {
+            return bandeja.bot(id, entrada != null && entrada.activo());
+        }
+    }
+
+    @RestController
+    @RequestMapping({"/api/public/whatsapp", "/api/public/whatsapp/"})
+    public static class WhatsappPublicoApi {
+        private final WhatsappGiroService whatsapp;
+        private final com.giro.servicio.WhatsappCola cola;
+        public WhatsappPublicoApi(WhatsappGiroService whatsapp, com.giro.servicio.WhatsappCola cola) {
+            this.whatsapp = whatsapp;
+            this.cola = cola;
+        }
+
+        @GetMapping
+        public ResponseEntity<String> verificar(jakarta.servlet.http.HttpServletRequest request) {
+            return whatsapp.verificar(
+                    request.getParameter("hub.mode"),
+                    request.getParameter("hub.verify_token"),
+                    request.getParameter("hub.challenge"));
+        }
+
+        @PostMapping
+        public ResponseEntity<Void> recibir(jakarta.servlet.http.HttpServletRequest request) throws java.io.IOException {
+            byte[] raw = request.getInputStream().readAllBytes();
+            if (!cola.aceptar(raw, request.getHeader("X-Hub-Signature-256"))) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+            return ResponseEntity.ok().build();
         }
     }
 

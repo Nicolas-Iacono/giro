@@ -14,7 +14,9 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 @Configuration
@@ -24,7 +26,13 @@ public class SecurityConfig {
 
     public SecurityConfig(JwtFilter jwtFilter, @Value("${giro.cors-origins}") String origins) {
         this.jwtFilter = jwtFilter;
-        this.origins = Arrays.stream(origins.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+        LinkedHashSet<String> permitidos = new LinkedHashSet<>();
+        Arrays.stream(origins.split(",")).map(String::trim).filter(s -> !s.isEmpty()).forEach(permitidos::add);
+        permitidos.add("https://jirohub.com");
+        permitidos.add("https://www.jirohub.com");
+        permitidos.add("https://minegocio.jirohub.com");
+        permitidos.add("https://www.minegocio.jirohub.com");
+        this.origins = new ArrayList<>(permitidos);
     }
 
     @Bean
@@ -41,7 +49,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/registro", "/api/auth/login").permitAll()
-                        .requestMatchers("/api/public/**").permitAll()
+                        .requestMatchers(request -> {
+                            String uri = request.getRequestURI();
+                            return uri != null && (uri.equals("/api/public") || uri.startsWith("/api/public/"));
+                        }).permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e.authenticationEntryPoint((req, res, ex) -> {
                     res.setStatus(401);

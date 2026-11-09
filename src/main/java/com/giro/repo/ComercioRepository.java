@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface ComercioRepository extends JpaRepository<Comercio, Long> {
     boolean existsBySlug(String slug);
     Optional<Comercio> findBySlug(String slug);
+    Optional<Comercio> findByWaPhoneNumberId(String waPhoneNumberId);
+    Optional<Comercio> findByWaWabaId(String waWabaId);
 }

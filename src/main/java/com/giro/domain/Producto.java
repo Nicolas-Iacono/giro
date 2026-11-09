@@ -30,6 +30,9 @@ public class Producto {
     @Column(nullable = false, length = 180)
     private String nombre;
 
+    @Column(length = 2000)
+    private String descripcion;
+
     @Column(length = 80)
     private String sku;
 
@@ -57,6 +60,24 @@ public class Producto {
     @Column(length = 20)
     private String publico;
 
+    @Column(length = 80)
+    private String marca;
+
+    @Column(length = 80)
+    private String modelo;
+
+    @Column(length = 40)
+    private String color;
+
+    @Column(length = 80)
+    private String material;
+
+    @Column(length = 80)
+    private String medidas;
+
+    @Column(length = 40)
+    private String peso;
+
     public Long getId() { return id; }
     public Comercio getComercio() { return comercio; }
     public void setComercio(Comercio comercio) { this.comercio = comercio; }
@@ -64,6 +85,8 @@ public class Producto {
     public void setCategoria(Categoria categoria) { this.categoria = categoria; }
     public String getNombre() { return nombre; }
     public void setNombre(String nombre) { this.nombre = nombre; }
+    public String getDescripcion() { return descripcion; }
+    public void setDescripcion(String descripcion) { this.descripcion = descripcion; }
     public String getSku() { return sku; }
     public void setSku(String sku) { this.sku = sku; }
     public BigDecimal getCosto() { return costo; }
@@ -82,4 +105,16 @@ public class Producto {
     public void setUsaVariantes(boolean usaVariantes) { this.usaVariantes = usaVariantes; }
     public String getPublico() { return publico; }
     public void setPublico(String publico) { this.publico = publico; }
+    public String getMarca() { return marca; }
+    public void setMarca(String marca) { this.marca = marca; }
+    public String getModelo() { return modelo; }
+    public void setModelo(String modelo) { this.modelo = modelo; }
+    public String getColor() { return color; }
+    public void setColor(String color) { this.color = color; }
+    public String getMaterial() { return material; }
+    public void setMaterial(String material) { this.material = material; }
+    public String getMedidas() { return medidas; }
+    public void setMedidas(String medidas) { this.medidas = medidas; }
+    public String getPeso() { return peso; }
+    public void setPeso(String peso) { this.peso = peso; }
 }

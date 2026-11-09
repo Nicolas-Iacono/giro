@@ -1,0 +1,23 @@
+ALTER TABLE comercios ADD COLUMN canal VARCHAR(20) NOT NULL DEFAULT 'FISICA';
+ALTER TABLE comercios ADD COLUMN rubro VARCHAR(80);
+ALTER TABLE comercios ADD COLUMN oferta VARCHAR(20) NOT NULL DEFAULT 'PRODUCTOS';
+ALTER TABLE comercios ADD COLUMN detalles_producto VARCHAR(200);
+ALTER TABLE comercios ADD COLUMN mp_titular VARCHAR(160);
+ALTER TABLE comercios ADD COLUMN mp_alias VARCHAR(80);
+ALTER TABLE comercios ADD COLUMN mp_cvu VARCHAR(22);
+ALTER TABLE comercios ADD COLUMN mp_cbu VARCHAR(22);
+ALTER TABLE comercios ADD COLUMN wa_phone_number_id VARCHAR(32);
+ALTER TABLE comercios ADD COLUMN wa_waba_id VARCHAR(32);
+ALTER TABLE comercios ADD COLUMN wa_access_token TEXT;
+ALTER TABLE comercios ADD COLUMN wa_numero VARCHAR(40);
+ALTER TABLE comercios ADD COLUMN wa_saludo VARCHAR(500);
+ALTER TABLE comercios ADD COLUMN wa_activo BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE UNIQUE INDEX uq_comercio_wa_phone ON comercios (wa_phone_number_id) WHERE wa_phone_number_id IS NOT NULL;
+
+ALTER TABLE productos ADD COLUMN marca VARCHAR(80);
+ALTER TABLE productos ADD COLUMN modelo VARCHAR(80);
+ALTER TABLE productos ADD COLUMN color VARCHAR(40);
+ALTER TABLE productos ADD COLUMN material VARCHAR(80);
+ALTER TABLE productos ADD COLUMN medidas VARCHAR(80);
+ALTER TABLE productos ADD COLUMN peso VARCHAR(40);

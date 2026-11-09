@@ -347,6 +347,8 @@ public class CatalogoService {
         body.put("descripcion", vidriera.getDescripcion() == null ? "" : vidriera.getDescripcion());
         body.put("color", vidriera.getColor());
         body.put("slug", vidriera.getComercio().getSlug());
+        body.put("oferta", vidriera.getComercio().getOferta() == null ? "PRODUCTOS" : vidriera.getComercio().getOferta());
+        body.put("detalles", detallesPublicos(vidriera.getComercio().getDetallesProducto()));
         cuerpoDiseno(body, vidriera);
         secciones(body, vidriera);
         body.put("productos", items);
@@ -395,6 +397,7 @@ public class CatalogoService {
             throw new NegocioException(HttpStatus.CONFLICT, "Ese SKU ya existe");
         }
         producto.setNombre(entrada.nombre().trim());
+        producto.setDescripcion(detalle(entrada.descripcion(), 2000));
         producto.setSku(sku);
         producto.setCosto(Textos.dinero(entrada.costo(), "El costo"));
         producto.setPrecio(Textos.dinero(entrada.precio(), "El precio"));
@@ -403,6 +406,12 @@ public class CatalogoService {
         producto.setPublicado(entrada.publicado());
         producto.setUsaVariantes(entrada.usaVariantes());
         producto.setPublico(publicoDe(entrada.publico()));
+        producto.setMarca(detalle(entrada.marca(), 80));
+        producto.setModelo(detalle(entrada.modelo(), 80));
+        producto.setColor(detalle(entrada.color(), 40));
+        producto.setMaterial(detalle(entrada.material(), 80));
+        producto.setMedidas(detalle(entrada.medidas(), 80));
+        producto.setPeso(detalle(entrada.peso(), 40));
         if (entrada.categoriaId() == null) {
             producto.setCategoria(null);
         } else {
@@ -523,12 +532,25 @@ public class CatalogoService {
         return valor == null || valor.isBlank() ? null : valor.trim();
     }
 
+    private List<String> detallesPublicos(String guardado) {
+        if (guardado == null || guardado.isBlank()) return List.of();
+        return List.of(guardado.split(",")).stream().map(String::trim).filter(item -> !item.isEmpty()).toList();
+    }
+
+    private String detalle(String valor, int maximo) {
+        String limpio = vacio(valor);
+        if (limpio == null) return null;
+        if (limpio.length() > maximo) throw new NegocioException("Uno de los datos del producto es demasiado largo");
+        return limpio;
+    }
+
     public Map<String, Object> vista(Producto producto) {
         List<Variante> vars = variantes.findByProductoIdAndActivoTrueOrderByNombreAsc(producto.getId());
         List<ImagenProducto> fotos = imagenes.findByProductoIdOrderByOrdenAsc(producto.getId());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("id", producto.getId());
         body.put("nombre", producto.getNombre());
+        body.put("descripcion", producto.getDescripcion());
         body.put("sku", producto.getSku());
         body.put("categoriaId", producto.getCategoria() == null ? null : producto.getCategoria().getId());
         body.put("categoria", producto.getCategoria() == null ? null : producto.getCategoria().getNombre());
@@ -541,6 +563,12 @@ public class CatalogoService {
         body.put("activo", producto.isActivo());
         body.put("usaVariantes", producto.isUsaVariantes());
         body.put("publico", producto.getPublico());
+        body.put("marca", producto.getMarca());
+        body.put("modelo", producto.getModelo());
+        body.put("color", producto.getColor());
+        body.put("material", producto.getMaterial());
+        body.put("medidas", producto.getMedidas());
+        body.put("peso", producto.getPeso());
         body.put("variantes", vars.stream().map(v -> {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("id", v.getId());

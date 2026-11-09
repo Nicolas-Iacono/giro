@@ -35,6 +35,7 @@ public final class Modelos {
 
     public record ProductoEntrada(
             @NotBlank String nombre,
+            String descripcion,
             String sku,
             Long categoriaId,
             @NotNull @DecimalMin("0.00") BigDecimal costo,
@@ -43,7 +44,13 @@ public final class Modelos {
             @NotNull @DecimalMin("0.000") BigDecimal stockMinimo,
             boolean publicado,
             boolean usaVariantes,
-            String publico) {}
+            String publico,
+            String marca,
+            String modelo,
+            String color,
+            String material,
+            String medidas,
+            String peso) {}
 
     public record VarianteEntrada(
             @NotBlank String nombre,
@@ -163,4 +170,36 @@ public final class Modelos {
             String codigoPostal,
             @NotNull @DecimalMin("0.00") BigDecimal base,
             @NotNull @DecimalMin("0.00") BigDecimal porKm) {}
+
+    public record AjustesEntrada(
+            @NotBlank @Size(max = 160) String nombre,
+            String calle,
+            String altura,
+            String localidad,
+            String partido,
+            String provincia,
+            String codigoPostal,
+            @NotBlank String canal,
+            List<String> rubros,
+            @NotBlank String oferta,
+            List<String> detalles,
+            String mpTitular,
+            String mpAlias,
+            String mpCvu,
+            String mpCbu,
+            String waPhoneNumberId,
+            String waWabaId,
+            String waAccessToken,
+            String waSaludo,
+            boolean waActivo,
+            boolean desconectarWhatsapp) {}
+
+    public record ProbarWhatsapp(String phoneNumberId, String accessToken) {}
+    public record SuscribirWhatsapp(String wabaId, String accessToken) {}
+
+    public record ConectarWhatsapp(String code, String phoneNumberId, String wabaId, String onboardingType, String state) {}
+
+    public record TextoWhatsapp(@NotBlank @Size(max = 3500) String texto) {}
+
+    public record BotWhatsapp(boolean activo) {}
 }

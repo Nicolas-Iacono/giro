@@ -425,6 +425,10 @@ public class ComercialService {
             cerrarAlCierreDelDia(vieja);
             fondo = vieja.getMontoContado();
             desde = vieja.getAbiertaEn().toLocalDate().plusDays(1);
+            // El id es IDENTITY: el INSERT de la caja nueva se ejecuta al instante,
+            // antes del UPDATE que cierra la anterior. Sin este flush, uq_caja_abierta
+            // sigue viendo la caja vieja como ABIERTA y el arranque revienta.
+            cajas.saveAndFlush(vieja);
         } else {
             java.util.Optional<Caja> ultima = cajas.findFirstByComercioIdOrderByAbiertaEnDesc(comercio.getId());
             if (ultima.isPresent()) {
