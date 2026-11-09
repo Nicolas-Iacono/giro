@@ -51,10 +51,8 @@ class AislamientoComercioTest {
                                 """))
                 .andExpect(status().isNotFound());
 
-        mvc.perform(post("/api/caja/abrir")
-                        .header("Authorization", "Bearer " + tokenB)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"montoInicial\":1000}"))
+        mvc.perform(get("/api/caja")
+                        .header("Authorization", "Bearer " + tokenB))
                 .andExpect(status().isOk());
 
         mvc.perform(post("/api/ventas")
@@ -73,10 +71,8 @@ class AislamientoComercioTest {
                 .andExpect(jsonPath("$.productos", hasSize(1)))
                 .andExpect(jsonPath("$.productos[0].nombre").value("Alfajor"));
 
-        mvc.perform(post("/api/caja/abrir")
-                        .header("Authorization", "Bearer " + tokenA)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"montoInicial\":500}"))
+        mvc.perform(get("/api/caja")
+                        .header("Authorization", "Bearer " + tokenA))
                 .andExpect(status().isOk());
 
         mvc.perform(post("/api/ventas")

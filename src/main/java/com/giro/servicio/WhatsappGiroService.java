@@ -132,13 +132,17 @@ public class WhatsappGiroService {
                 String phoneId = texto(value.path("metadata").path("phone_number_id"));
                 Comercio comercio = phoneId == null ? null : comercios.findByWaPhoneNumberId(phoneId).orElse(null);
                 if (comercio == null) continue;
+                if (comercio.getWaWabaId() != null && !comercio.getWaWabaId().equals(wabaEntrada)) continue;
                 String display = texto(value.path("metadata").path("display_phone_number"));
                 if (display != null && !display.equals(comercio.getWaNumero())) comercio.setWaNumero(display);
                 if ("history".equals(campo) || value.has("history")) historial(comercio, value);
                 if ("smb_app_state_sync".equals(campo) || value.has("state_sync")) contactosDeApp(comercio, value);
                 if (value.has("messages") || "messages".equals(campo)) {
-                    for (JsonNode mensaje : value.path("messages")) entrante(comercio, phoneId, value, mensaje);
-                    for (JsonNode status : value.path("statuses")) estadoMeta(status);
+                    for (JsonNode mensaje : value.path("messages")) {
+                        if ("smb_message_echoes".equals(campo)) ecoDeCelular(comercio, mensaje);
+                        else entrante(comercio, phoneId, value, mensaje);
+                    }
+                    for (JsonNode status : value.path("statuses")) estadoMeta(comercio, status);
                 }
                 JsonNode ecos = value.has("message_echoes") ? value.path("message_echoes") : value.path("smb_message_echoes");
                 for (JsonNode eco : ecos) ecoDeCelular(comercio, eco);
@@ -205,13 +209,15 @@ public class WhatsappGiroService {
         JsonNode canje = intercambiar(code.trim());
         String token = texto(canje.path("access_token"));
         if (token == null) throw new NegocioException("Meta no entregó el token del comercio");
-        java.util.Set<String> cuentas = cuentasDelToken(token);
+        JsonNode autorizacion = validarToken(token);
+        java.util.Set<String> cuentas = cuentasDelToken(autorizacion);
         String cuenta = wabaId == null || wabaId.isBlank() ? null : wabaId.trim();
-        if (cuenta != null && !cuentas.contains(cuenta)) {
+        if (cuenta != null && !cuentas.isEmpty() && !cuentas.contains(cuenta)) {
             throw new NegocioException("Esa cuenta de WhatsApp no está autorizada por el token de Meta");
         }
         if (cuenta == null) {
             if (cuentas.isEmpty()) throw new NegocioException("Meta no informó la cuenta de WhatsApp de este comercio");
+            if (cuentas.size() != 1) throw new NegocioException("Meta autorizó varias cuentas. Volvé a conectar y elegí el número del comercio.");
             cuenta = cuentas.iterator().next();
         }
         JsonNode lista = graph("GET", "/" + cuenta + "/phone_numbers?fields=id,display_phone_number,verified_name,is_on_biz_app,platform_type", token, null);
@@ -235,7 +241,10 @@ public class WhatsappGiroService {
         String numero = texto(elegido.path("id"));
         JsonNode ficha = graph("GET", "/" + numero + "?fields=display_phone_number,verified_name,is_on_biz_app,platform_type", token, null);
         boolean informado = ficha.has("is_on_biz_app") && !ficha.path("is_on_biz_app").isNull();
-        boolean coexistencia = informado ? ficha.path("is_on_biz_app").asBoolean(false) : "COEXISTENCIA".equals(tipoPedido);
+        boolean coexistencia = informado && ficha.path("is_on_biz_app").asBoolean(false);
+        if (!coexistencia) {
+            throw new NegocioException("Meta no confirmó coexistencia para este número. Elegí el WhatsApp Business que ya usás en el celular. No se registró ni migró el número desde Jiro.");
+        }
         boolean suscripto = true;
         String avisoSuscripcion = null;
         try {
@@ -245,12 +254,19 @@ public class WhatsappGiroService {
             avisoSuscripcion = ex.getMessage();
         }
         boolean sincronizado = false;
+        boolean camposSuscriptos = false;
         try {
             suscribirCamposApp();
+            camposSuscriptos = true;
         } catch (NegocioException ex) {
             if (avisoSuscripcion == null) avisoSuscripcion = ex.getMessage();
         }
-        if (coexistencia) sincronizado = pedirSincronizacion(numero, token);
+        // El historial puede llegar inmediatamente; se solicita después de guardar el
+        // comercio en una acción separada para no perder eventos durante el alta.
+        if (!camposSuscriptos || !suscripto) {
+            avisoSuscripcion = "La cuenta está autorizada, pero falta completar el webhook. Revisá la configuración y tocá Suscribir a la app de Giro. "
+                    + (avisoSuscripcion == null ? "" : avisoSuscripcion);
+        }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("accessToken", token);
         body.put("expiresIn", canje.path("expires_in").isNumber() ? canje.path("expires_in").asLong() : null);
@@ -259,13 +275,13 @@ public class WhatsappGiroService {
         body.put("displayPhoneNumber", texto(ficha.path("display_phone_number")));
         body.put("verifiedName", texto(ficha.path("verified_name")));
         body.put("tipo", coexistencia ? "COEXISTENCIA" : "ESTANDAR");
-        body.put("webhookSuscripto", suscripto);
+        body.put("webhookSuscripto", suscripto && camposSuscriptos);
         body.put("sincronizacionPedida", sincronizado);
         body.put("avisoSuscripcion", avisoSuscripcion);
         return body;
     }
 
-    private boolean pedirSincronizacion(String numero, String token) {
+    public boolean pedirSincronizacion(String numero, String token) {
         boolean ok = true;
         for (String tipo : java.util.List.of("smb_app_state_sync", "history")) {
             try {
@@ -450,7 +466,9 @@ public class WhatsappGiroService {
         LocalDateTime cuando = epoch(mensaje.path("timestamp"));
         WhatsappContacto contacto = contactoDe(comercio, desde, nombreDe(value, desde));
         if (!anotar(contacto, "ENTRANTE", "CLIENTE", escrito, true, metaId, null, cuando)) return;
-        contacto.setUltimoClienteEn(cuando);
+        if (contacto.getUltimoClienteEn() == null || cuando.isAfter(contacto.getUltimoClienteEn())) {
+            contacto.setUltimoClienteEn(cuando);
+        }
         if (!puedeResponder(comercio) || !contacto.isBotActivo() || !"text".equals(tipo)) return;
         try {
             String respuesta = responder(comercio, escrito);
@@ -472,7 +490,7 @@ public class WhatsappGiroService {
         anotar(contacto, "SALIENTE", "TELEFONO", escrito, false, texto(eco.path("id")), "ENVIADO", epoch(eco.path("timestamp")));
     }
 
-    private void estadoMeta(JsonNode status) {
+    private void estadoMeta(Comercio comercio, JsonNode status) {
         String metaId = texto(status.path("id"));
         String nuevo = switch (texto(status.path("status")) == null ? "" : texto(status.path("status"))) {
             case "sent" -> "ENVIADO";
@@ -483,7 +501,8 @@ public class WhatsappGiroService {
         };
         if (metaId == null || nuevo == null) return;
         mensajes.findByMetaId(metaId).ifPresent(mensaje -> {
-            if (rango(nuevo) >= rango(mensaje.getEstado())) mensaje.setEstado(nuevo);
+            if (mensaje.getContacto().getComercio().getId().equals(comercio.getId())
+                    && rango(nuevo) >= rango(mensaje.getEstado())) mensaje.setEstado(nuevo);
         });
     }
 
@@ -559,8 +578,10 @@ public class WhatsappGiroService {
         } catch (org.springframework.dao.DataIntegrityViolationException ex) {
             return false;
         }
-        contacto.setUltimoTexto(cuerpo.length() > 500 ? cuerpo.substring(0, 500) : cuerpo);
-        if (contacto.getUltimoEn() == null || mensaje.getCreadoEn().isAfter(contacto.getUltimoEn())) contacto.setUltimoEn(mensaje.getCreadoEn());
+        if (contacto.getUltimoEn() == null || !mensaje.getCreadoEn().isBefore(contacto.getUltimoEn())) {
+            contacto.setUltimoTexto(cuerpo.length() > 500 ? cuerpo.substring(0, 500) : cuerpo);
+            contacto.setUltimoEn(mensaje.getCreadoEn());
+        }
         if (noLeido) contacto.setNoLeidos(contacto.getNoLeidos() + 1);
         else if ("SALIENTE".equals(direccion) && "LOCAL".equals(origen)) contacto.setNoLeidos(0);
         return true;
@@ -609,10 +630,27 @@ public class WhatsappGiroService {
         return pedir("GET", "/oauth/access_token?" + consulta, null, null);
     }
 
-    private java.util.Set<String> cuentasDelToken(String token) {
-        JsonNode data = pedir("GET", "/debug_token?input_token=" + java.net.URLEncoder.encode(token, StandardCharsets.UTF_8), appId + "|" + appSecret, null);
+    private JsonNode validarToken(String token) {
+        if (appId.isBlank() || appSecret.isBlank()) {
+            throw new NegocioException("Falta configurar la app y el App Secret de Jiro en el servidor");
+        }
+        JsonNode data = pedir("GET", "/debug_token?input_token=" + java.net.URLEncoder.encode(token, StandardCharsets.UTF_8), appId + "|" + appSecret, null).path("data");
+        if (!data.path("is_valid").asBoolean(false)) throw new NegocioException("El token de WhatsApp venció o fue revocado. Volvé a conectar.");
+        if (!appId.equals(texto(data.path("app_id")))) {
+            throw new NegocioException("Ese token pertenece a otra app de Meta. Usá el token de Jiro, no el de Tuinmo.");
+        }
+        java.util.Set<String> permisos = new java.util.HashSet<>();
+        for (JsonNode scope : data.path("scopes")) permisos.add(scope.asText());
+        for (JsonNode scope : data.path("granular_scopes")) permisos.add(scope.path("scope").asText());
+        if (!permisos.containsAll(java.util.Set.of("whatsapp_business_management", "whatsapp_business_messaging"))) {
+            throw new NegocioException("El token no incluye whatsapp_business_management y whatsapp_business_messaging. Revisá los permisos de Jiro y su aprobación en Meta.");
+        }
+        return data;
+    }
+
+    private java.util.Set<String> cuentasDelToken(JsonNode data) {
         java.util.LinkedHashSet<String> cuentas = new java.util.LinkedHashSet<>();
-        for (JsonNode alcance : data.path("data").path("granular_scopes")) {
+        for (JsonNode alcance : data.path("granular_scopes")) {
             if (!"whatsapp_business_management".equals(texto(alcance.path("scope")))) continue;
             for (JsonNode id : alcance.path("target_ids")) {
                 String valor = texto(id);
@@ -620,6 +658,21 @@ public class WhatsappGiroService {
             }
         }
         return cuentas;
+    }
+
+    public Map<String, Object> validarCredenciales(String phoneId, String wabaId, String token) {
+        if (vacio(phoneId) || vacio(wabaId) || vacio(token)) {
+            throw new NegocioException("Completá Phone Number ID, WABA ID y token de la misma cuenta de Jiro");
+        }
+        JsonNode autorizacion = validarToken(token);
+        var cuentas = cuentasDelToken(autorizacion);
+        if (!cuentas.isEmpty() && !cuentas.contains(wabaId)) throw new NegocioException("El token no autoriza esa cuenta de WhatsApp");
+        // La pertenencia se comprueba en la API; debug_token no siempre incluye target_ids.
+        JsonNode phones = graph("GET", "/" + wabaId + "/phone_numbers?fields=id", token, null);
+        boolean encontrado = false;
+        for (JsonNode phone : phones.path("data")) if (phoneId.equals(texto(phone.path("id")))) encontrado = true;
+        if (!encontrado) throw new NegocioException("El Phone Number ID no pertenece a la WABA seleccionada");
+        return probar(phoneId, token);
     }
 
     private boolean puedeEnviar(Comercio comercio) {
@@ -716,7 +769,12 @@ public class WhatsappGiroService {
                 int code = data.path("error").path("code").asInt(0);
                 if (WhatsappFirma.esRevocacion(code)) throw new TokenRevocadoException();
                 String detalle = texto(data.path("error").path("message"));
-                throw new NegocioException(detalle == null ? "Meta no aceptó la conexión de Giro" : detalle);
+                int subcode = data.path("error").path("error_subcode").asInt(0);
+                if (code == 100 && subcode == 33) throw new NegocioException("Meta no permite acceder a ese recurso con este token (100/33). Revisá la app, los permisos y los IDs; esto no demuestra que el número haya sido eliminado.");
+                if (code == 2655111) throw new NegocioException("Meta requiere acceso avanzado aprobado para whatsapp_business_messaging y whatsapp_business_management. Completá Revisión de la app y usá el número de prueba mientras tanto (2655111).");
+                if (detalle != null && token != null) detalle = detalle.replace(token, "[token]");
+                if (detalle != null && !appSecret.isBlank()) detalle = detalle.replace(appSecret, "[secreto]");
+                throw new NegocioException(detalle == null ? "Meta no aceptó la conexión de Jiro" : detalle);
             }
             return data;
         } catch (NegocioException ex) {
